@@ -20,6 +20,7 @@ import (
 	"context"
 
 	openshiftconfigv1 "github.com/openshift/api/config/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -63,15 +64,16 @@ func (a *AggregatedClusterOperatorReconciler) Reconcile(ctx context.Context, req
 	}
 	defer func() {
 		if err := coWriter.UpdateStatus(ctx, aggregatedCO, coBuilder.GetStatus()); err != nil {
-			log.Error(err, "error updating CO status")
+			log.Error(err, "error updating cluster operator status")
 		}
 	}()
 
 	// Set the default CO status conditions: Progressing=True, Degraded=False, Available=False
-	coBuilder.WithProgressing(openshiftconfigv1.ConditionTrue, "")
-	coBuilder.WithDegraded(openshiftconfigv1.ConditionFalse)
-	coBuilder.WithAvailable(openshiftconfigv1.ConditionFalse, "", "")
-	coBuilder.WithVersion("operator", a.ReleaseVersion)
+	// TODO: always set a reason (message is optional, but desirable)
+	coBuilder.WithProgressing(metav1.ConditionTrue, "", "")
+	coBuilder.WithDegraded(metav1.ConditionFalse, "", "")
+	coBuilder.WithAvailable(metav1.ConditionFalse, "", "")
+	coBuilder.WithOperand("operator", a.ReleaseVersion)
 
 	poList := &platformv1alpha1.PlatformOperatorList{}
 	if err := a.List(ctx, poList); err != nil {
@@ -79,8 +81,12 @@ func (a *AggregatedClusterOperatorReconciler) Reconcile(ctx context.Context, req
 	}
 	if len(poList.Items) == 0 {
 		// No POs on cluster, everything is fine
-		coBuilder.WithAvailable(openshiftconfigv1.ConditionTrue, "No POs are present in the cluster", "NoPOsFound")
-		coBuilder.WithProgressing(openshiftconfigv1.ConditionFalse, "No POs are present in the cluster")
+		// TODO: cleanup condition reasons.
+		//   1. use constants for condition reasons.
+		//   2. discuss/agree on reason values.
+		//   3. don't use abbreviations.
+		coBuilder.WithAvailable(metav1.ConditionTrue, "NoPOsFound", "No POs are present in the cluster")
+		coBuilder.WithProgressing(metav1.ConditionFalse, "", "No POs are present in the cluster")
 		return ctrl.Result{}, nil
 	}
 
@@ -88,11 +94,11 @@ func (a *AggregatedClusterOperatorReconciler) Reconcile(ctx context.Context, req
 	// any failing status states, and update the aggregate CO resource
 	// to reflect those failing PO resources.
 	if statusErrorCheck := util.InspectPlatformOperators(poList); statusErrorCheck != nil {
-		coBuilder.WithAvailable(openshiftconfigv1.ConditionFalse, statusErrorCheck.Error(), "POError")
+		coBuilder.WithAvailable(metav1.ConditionFalse, "POError", statusErrorCheck.Error())
 		return ctrl.Result{}, nil
 	}
-	coBuilder.WithAvailable(openshiftconfigv1.ConditionTrue, "All POs in a successful state", "POsHealthy")
-	coBuilder.WithProgressing(openshiftconfigv1.ConditionFalse, "All POs in a successful state")
+	coBuilder.WithAvailable(metav1.ConditionTrue, "POsHealthy", "All POs in a successful state")
+	coBuilder.WithProgressing(metav1.ConditionFalse, "", "All POs in a successful state")
 
 	return ctrl.Result{}, nil
 }

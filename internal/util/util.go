@@ -3,9 +3,11 @@ package util
 import (
 	"context"
 	"fmt"
+	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
 	rukpakv1alpha1 "github.com/operator-framework/rukpak/api/v1alpha1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -71,20 +73,17 @@ func RequeueClusterOperator(c client.Client, name string) handler.MapFunc {
 	}
 }
 
-// InspectPlatformOperators iterates over all the POs on the cluster
+// InspectPlatformOperators iterates over all the POs in the list
 // and determines whether a PO is in a failing state by inspecting its status.
 // A nil return value indicates no errors were found with the POs provided.
-func InspectPlatformOperators(POList *platformv1alpha1.PlatformOperatorList) error {
-	var failingPOs []error
-	for _, po := range POList.Items {
+func InspectPlatformOperators(poList *platformv1alpha1.PlatformOperatorList) error {
+	var poErrors []error
+	for _, po := range poList.Items {
 		if err := inspectPlatformOperator(po); err != nil {
-			failingPOs = append(failingPOs, err)
+			poErrors = append(poErrors, err)
 		}
 	}
-	if len(failingPOs) > 0 {
-		return utilerror.NewAggregate(failingPOs)
-	}
-	return nil
+	return utilerror.NewAggregate(poErrors)
 }
 
 // inspectPlatformOperator is responsible for inspecting an individual platform
@@ -92,6 +91,10 @@ func InspectPlatformOperators(POList *platformv1alpha1.PlatformOperatorList) err
 // In the case that the PO resource is expressing failing states, then an error
 // will be returned to reflect that.
 func inspectPlatformOperator(po platformv1alpha1.PlatformOperator) error {
+	if equality.Semantic.DeepEqual(po.Status, platformv1alpha1.PlatformOperatorStatus{}) &&
+		(po.CreationTimestamp.IsZero() || time.Since(po.CreationTimestamp.Time) < time.Minute) {
+		return nil
+	}
 	installed := meta.FindStatusCondition(po.Status.Conditions, platformtypes.TypeInstalled)
 	if installed == nil {
 		return buildPOFailureMessage(po.GetName(), platformtypes.ReasonInstallPending)

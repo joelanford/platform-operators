@@ -46,7 +46,7 @@ func Test_inspectPlatformOperator(t *testing.T) {
 					},
 				},
 			},
-			wantErr: true,
+			wantErr: false,
 		},
 		{
 			name: "InstallFailed",
