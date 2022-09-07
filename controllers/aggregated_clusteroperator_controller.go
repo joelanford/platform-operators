@@ -109,6 +109,6 @@ func (a *AggregatedClusterOperatorReconciler) SetupWithManager(mgr ctrl.Manager)
 		For(&openshiftconfigv1.ClusterOperator{}, builder.WithPredicates(predicate.NewPredicateFuncs(func(object client.Object) bool {
 			return object.GetName() == aggregateCOName
 		}))).
-		Watches(&source.Kind{Type: &platformv1alpha1.PlatformOperator{}}, handler.EnqueueRequestsFromMapFunc(util.RequeueClusterOperator(mgr.GetClient(), aggregateCOName))).
+		Watches(&source.Kind{Type: &platformv1alpha1.PlatformOperator{}}, handler.EnqueueRequestsFromMapFunc(util.RequeueClusterOperator(aggregateCOName))).
 		Complete(a)
 }

@@ -148,7 +148,7 @@ func (r *PlatformOperatorReconciler) ensureDesiredBundleDeployment(ctx context.C
 func (r *PlatformOperatorReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&platformv1alpha1.PlatformOperator{}).
+		Owns(&rukpakv1alpha1.BundleDeployment{}).
 		Watches(&source.Kind{Type: &operatorsv1alpha1.CatalogSource{}}, handler.EnqueueRequestsFromMapFunc(util.RequeuePlatformOperators(mgr.GetClient()))).
-		Watches(&source.Kind{Type: &rukpakv1alpha1.BundleDeployment{}}, handler.EnqueueRequestsFromMapFunc(util.RequeueBundleDeployment(mgr.GetClient()))).
 		Complete(r)
 }

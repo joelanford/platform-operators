@@ -3,10 +3,7 @@ package util
 import (
 	"context"
 	"fmt"
-	"time"
 
-	configv1 "github.com/openshift/api/config/v1"
-	rukpakv1alpha1 "github.com/operator-framework/rukpak/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -39,37 +36,9 @@ func RequeuePlatformOperators(cl client.Client) handler.MapFunc {
 	}
 }
 
-func RequeueBundleDeployment(c client.Client) handler.MapFunc {
+func RequeueClusterOperator(name string) handler.MapFunc {
 	return func(obj client.Object) []reconcile.Request {
-		bi := obj.(*rukpakv1alpha1.BundleDeployment)
-
-		poList := &platformv1alpha1.PlatformOperatorList{}
-		if err := c.List(context.Background(), poList); err != nil {
-			return nil
-		}
-
-		var requests []reconcile.Request
-		for _, po := range poList.Items {
-			po := po
-
-			for _, ref := range bi.GetOwnerReferences() {
-				if ref.Name == po.GetName() {
-					requests = append(requests, reconcile.Request{NamespacedName: client.ObjectKeyFromObject(&po)})
-				}
-			}
-		}
-		return requests
-	}
-}
-
-func RequeueClusterOperator(c client.Client, name string) handler.MapFunc {
-	return func(obj client.Object) []reconcile.Request {
-		co := &configv1.ClusterOperator{}
-
-		if err := c.Get(context.Background(), types.NamespacedName{Name: name}, co); err != nil {
-			return nil
-		}
-		return []reconcile.Request{{NamespacedName: client.ObjectKeyFromObject(co)}}
+		return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: name}}}
 	}
 }
 
